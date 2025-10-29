@@ -1,158 +1,35 @@
-// --- CẤU HÌNH ---
-        const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwr8EVpgbB-occKnqIiVwq4bCAC0giw8kN8OOXCtcwmY5QBA5MahyMrppEoCDtcgvq-ew/exec";
-        const MESSAGE_TO_SIGN_HEX = "281ba5f69f4b943e3fb8a20390878a232787a04e4be22177f2472b63df01c200";
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cardano Signature Tool v4.0</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
 
-        // --- BIẾN TOÀN CỤC ---
-        let cardano, walletAPI, vpsName, machineConfig;
-
-        // --- HÀM TIỆN ÍCH ---
-        const showLoader = (show) => { document.getElementById('loading-overlay').style.display = show ? 'flex' : 'none'; };
-        const hexToBytes = (hex) => {
-            if (!hex || hex.length % 2 !== 0) return new Uint8Array();
-            const bytes = new Uint8Array(hex.length / 2);
-            for (let i = 0; i < hex.length; i += 2) {
-                bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
-            }
-            return bytes;
-        };
-
-        // --- LOGIC JSONP ---
-        function jsonp_callback(data) {
-            showLoader(false);
-            if (data.error) {
-                document.getElementById('worker-slots').innerHTML = `<p style="color:red;">Lỗi khi lấy cấu hình máy: ${data.error}</p>`;
-                return;
-            }
-            machineConfig = data;
-            renderWorkerSlots();
-        }
-        async function fetchMachineConfig() {
-            document.getElementById('status-text').textContent = 'Đang tải cấu hình máy chủ...';
-            showLoader(true);
-            const script = document.createElement('script');
-            script.src = `${API_ENDPOINT}?action=get_vps_config&vps_name=${vpsName}&callback=jsonp_callback`;
-            document.body.appendChild(script);
-            script.onerror = () => {
-                showLoader(false);
-                document.getElementById('status-text').textContent = "Lỗi mạng khi gọi C2 API.";
-            };
-            script.onload = () => document.body.removeChild(script);
-        }
-
-        // --- LOGIC CHÍNH ---
-        function renderWorkerSlots() {
-            if (!machineConfig) return;
-            document.getElementById('vps-title').textContent = `Trạng thái các Slot trên: ${machineConfig.vpsName}`;
-            const container = document.getElementById('worker-slots');
-            container.innerHTML = '';
-            machineConfig.slots.forEach((slot, index) => {
-                const isOperatorSlot = index === 0;
-                const slotType = isOperatorSlot ? 'Operator' : 'Partner';
-                const slotDiv = document.createElement('div');
-                slotDiv.id = `slot-${index}`;
-                slotDiv.className = `slot ${isOperatorSlot ? 'operator' : 'partner'}`;
-                let content;
-                if (slot) {
-                    content = `<div class="slot-info"><span class="tag">[Slot ${index} - ${slotType}]</span><br><span class="address">Đã gán: ${slot.walletAddress}</span></div><button class="button" disabled>Đã kích hoạt</button>`;
-                } else {
-                    content = `<div class="slot-info"><span class="tag">[Slot ${index} - ${slotType}]</span><br><span class="address">Trạng thái: Trống</span></div><button class="button assign-btn" onclick="assignSlot(${index}, ${isOperatorSlot})">Ký & Gán</button>`;
-                }
-                slotDiv.innerHTML = content;
-                container.appendChild(slotDiv);
-            });
-            document.getElementById('main-content').style.display = 'block';
-        }
-
-        async function assignSlot(slotIndex, isOperator) {
-            if (!walletAPI) { alert("Vui lòng kết nối ví trước."); return; }
-            const button = document.querySelector(`#slot-${index} button`);
-            button.textContent = 'Đang ký...';
-            button.disabled = true;
-            showLoader(true);
-            try {
-                const unusedAddressesHex = await walletAPI.getUnusedAddresses();
-                if (unusedAddressesHex.length === 0) throw new Error("Ví không có địa chỉ chưa sử dụng.");
-                const addressHex = unusedAddressesHex[0];
-                const addressBech32 = cardano.Address.from_bytes(hexToBytes(addressHex)).to_bech32();
-                const signedData = await walletAPI.signData(addressHex, MESSAGE_TO_SIGN_HEX);
-                const registrationData = {
-                    vps_name: vpsName, slot_index: slotIndex, is_operator_slot: isOperator,
-                    address: addressBech32, publicKey: signedData.key, signature: signedData.signature
-                };
-                const callbackName = 'assign_callback_' + new Date().getTime();
-                window[callbackName] = function(result) {
-                    delete window[callbackName];
-                    if (result.status !== 'success') throw new Error(result.message || "Lỗi không xác định từ server.");
-                    fetchMachineConfig();
-                };
-                const script = document.createElement('script');
-                script.src = `${API_ENDPOINT}?action=assign_slot&data=${encodeURIComponent(JSON.stringify(registrationData))}&callback=${callbackName}`;
-                document.body.appendChild(script);
-                script.onerror = () => { throw new Error("Lỗi mạng khi gửi dữ liệu đã ký."); };
-                script.onload = () => document.body.removeChild(script);
-            } catch (error) {
-                alert(`Gán slot thất bại: ${error.message}`);
-                button.textContent = 'Ký & Gán';
-                button.disabled = false;
-                showLoader(false);
-            }
-        }
-
-        async function connectWallet() {
-            if (typeof window.cardano === 'undefined' || Object.keys(window.cardano).length === 0) {
-                alert('Lỗi: Không tìm thấy ví Cardano. Vui lòng cài đặt extension (Eternl, Nami, Yoroi).');
-                return;
-            }
-            showLoader(true);
-            try {
-                const supportedWallets = ['eternl', 'nami', 'yoroi'];
-                let chosenWalletName = null;
-                for (const name of supportedWallets) {
-                    if (window.cardano[name]) {
-                        chosenWalletName = name;
-                        break;
-                    }
-                }
-                if (!chosenWalletName) throw new Error("Không tìm thấy ví tương thích nào.");
-                walletAPI = await window.cardano[chosenWalletName].enable();
-                const connectBtn = document.getElementById('connect-wallet-btn');
-                connectBtn.textContent = 'Đã kết nối';
-                connectBtn.disabled = true;
-                await fetchMachineConfig();
-            } catch (error) {
-                alert(`Kết nối thất bại: ${error.message}`);
-                showLoader(false);
-            }
-        }
+    <div class="container">
+        <h1>Công cụ Ký Cardano (State-Aware)</h1>
         
-        // === HÀM KHỞI TẠO CHÍNH (SỬA LỖI RACE CONDITION) ===
-        function main() {
-            const urlParams = new URLSearchParams(window.location.search);
-            vpsName = urlParams.get('vps_name');
-            const connectBtn = document.getElementById('connect-wallet-btn');
-            if (!vpsName) {
-                document.getElementById('status-text').textContent = "URL không hợp lệ. Vui lòng cung cấp `?vps_name=TEN_VPS`.";
-                connectBtn.disabled = true;
-            } else {
-                connectBtn.addEventListener('click', connectWallet);
-            }
-        }
-        
-        // --- KHỞI CHẠY ---
-        // Đảm bảo rằng logic chính chỉ chạy SAU KHI thư viện đã được tải xong.
-        window.addEventListener('DOMContentLoaded', () => {
-            if (window.cardano_serialization_lib) {
-                window.cardano_serialization_lib.load()
-                    .then((lib) => {
-                        cardano = lib;
-                        main(); // Gọi hàm chính
-                    })
-                    .catch(e => {
-                        alert("Không thể tải thư viện Cardano. Vui lòng làm mới trang.");
-                        console.error("Lỗi khi tải cardano_serialization_lib:", e);
-                    });
-            } else {
-                console.error("Đối tượng cardano_serialization_lib không tồn tại. Script có thể đã không được tải.");
-                alert("Lỗi nghiêm trọng: Thư viện Cardano không được tải. Kiểm tra lại thẻ script trong HTML.");
-            }
-        });
+        <div class="actions">
+            <button id="connectBtn" class="btn">Kết nối Ví</button>
+            <button id="signBtn" class="btn btn-primary hidden">Ký Dữ liệu</button>
+            <button id="disconnectBtn" class="btn btn-secondary hidden">Ngắt kết nối</button>
+        </div>
+
+        <div id="statusMessage" class="status"></div>
+
+        <div class="results">
+            <p><strong>Stake Address:</strong> <code id="ownerAddress">Chưa kết nối</code></p>
+        </div>
+
+        <div class="output-container hidden">
+            <h3>Kết quả JSON:</h3>
+            <pre><code id="jsonOutput"></code></pre>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+
+</body>
+</html>
