@@ -1,4 +1,4 @@
-// app.js
+// app.js (Patched Version)
 
 document.addEventListener('DOMContentLoaded', () => {
     // === DOM Element Selection ===
@@ -94,6 +94,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
             walletApi = await window.cardano[walletName].enable();
             
+            // --- FIX START ---
+            // Gán các trình lắng nghe sự kiện VÀO ĐỐI TƯỢNG API CỦA VÍ, sau khi đã kết nối thành công.
+            if (walletApi.onAccountChange) {
+                walletApi.onAccountChange(() => resetState('Tài khoản ví đã thay đổi.'));
+            }
+            if (walletApi.onNetworkChange) {
+                walletApi.onNetworkChange(() => resetState('Mạng ví đã thay đổi.'));
+            }
+            // --- FIX END ---
+            
             // Validation 1: Kiểm tra địa chỉ Stake
             const rewardAddresses = await walletApi.getRewardAddresses();
             if (!rewardAddresses || rewardAddresses.length === 0) {
@@ -128,26 +138,21 @@ document.addEventListener('DOMContentLoaded', () => {
         updateUIState('signing');
 
         try {
-            // (Quan trọng) Lấy lại địa chỉ mới nhất để giảm thiểu race condition
             const freshUnusedAddresses = await walletApi.getUnusedAddresses();
             if (!freshUnusedAddresses || freshUnusedAddresses.length === 0) {
                 throw new Error('Không lấy được địa chỉ thanh toán mới nhất.');
             }
             const paymentAddress = freshUnusedAddresses[0];
 
-            // Tạo Nonce an toàn
             const nonceArray = new Uint32Array(1);
             window.crypto.getRandomValues(nonceArray);
             const nonce = `nonce-${nonceArray[0]}`;
 
-            // Tạo và mã hóa Payload
             const originalPayload = `Xác thực cho hệ thống kiểm thử Sign-Mine-NIGHT với nonce: ${nonce}`;
             const hexPayload = utf8StringToHex(originalPayload);
             
-            // Yêu cầu ký
             const signedData = await walletApi.signData(paymentAddress, hexPayload);
 
-            // Xử lý và xuất kết quả
             const resultJSON = {
                 owner: stakeAddress,
                 publicKey: signedData.key,
@@ -165,19 +170,15 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Lỗi khi ký dữ liệu:', error);
             showStatus(error.info || error.message || 'Yêu cầu ký đã bị hủy.', 'error');
         } finally {
-            updateUIState('connected'); // Quay lại trạng thái đã kết nối dù thành công hay thất bại
+            updateUIState('connected');
         }
     };
 
     /**
-     * Khởi tạo ứng dụng: kiểm tra ví và thiết lập các trình lắng nghe sự kiện.
+     * Khởi tạo ứng dụng.
      */
     const initialize = () => {
-        if (typeof window.cardano !== 'undefined') {
-            // Lắng nghe sự kiện thay đổi tài khoản hoặc mạng
-            window.cardano.onAccountChange(() => resetState('Tài khoản ví đã thay đổi.'));
-            window.cardano.onNetworkChange(() => resetState('Mạng ví đã thay đổi.'));
-        } else {
+        if (typeof window.cardano === 'undefined') {
             showStatus('Vui lòng cài đặt một ví Cardano (ví dụ: Yoroi, Eternl).', 'error');
             connectBtn.disabled = true;
         }
@@ -186,9 +187,8 @@ document.addEventListener('DOMContentLoaded', () => {
         signBtn.addEventListener('click', handleSign);
         disconnectBtn.addEventListener('click', () => resetState('Người dùng ngắt kết nối.'));
 
-        resetState(); // Bắt đầu ở trạng thái ban đầu
+        resetState();
     };
 
-    // Khởi chạy ứng dụng
     initialize();
 });
