@@ -1,125 +1,14 @@
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign Mine NIGHT - Kích hoạt Máy chủ</title>
-    <script src="https://cdn.jsdelivr.net/npm/@emurgo/cardano-serialization-lib-asmjs@11.5.0/cardano-serialization-lib.asm.js"></script>
-    <style>
-        :root {
-            --primary-color: #f39c12;
-            --background-color: #121212;
-            --surface-color: #1e1e1e;
-            --text-color: #e0e0e0;
-            --text-secondary-color: #999;
-            --success-color: #27ae60;
-            --partner-color: #3498db;
-            --error-color: #e74c3c;
-        }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--background-color);
-            color: var(--text-color);
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            min-height: 100vh;
-            margin: 0;
-            padding: 50px 20px;
-        }
-        .container {
-            background-color: var(--surface-color);
-            padding: 30px 40px;
-            border-radius: 12px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-            max-width: 800px;
-            width: 100%;
-        }
-        h1 {
-            color: var(--primary-color);
-            margin-bottom: 10px;
-            text-align: center;
-        }
-        h2 {
-            color: #ccc;
-            border-bottom: 1px solid #444;
-            padding-bottom: 10px;
-            margin-top: 30px;
-        }
-        .button {
-            background-color: var(--primary-color);
-            color: var(--background-color);
-            border: none;
-            padding: 12px 24px;
-            font-size: 16px;
-            font-weight: bold;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: inline-block;
-        }
-        .button:hover:not(:disabled) {
-            background-color: #e67e22;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-        }
-        .button:disabled {
-            background-color: #555;
-            color: #888;
-            cursor: not-allowed;
-        }
-        .connect-section { text-align: center; margin-bottom: 30px; }
-        #status-text { text-align: center; margin-top: 20px; font-style: italic; color: var(--text-secondary-color); height: 20px; transition: color 0.3s; }
-        #worker-slots { margin-top: 20px; }
-        .slot {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: space-between;
-            align-items: center;
-            background-color: #2a2a2a;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 10px;
-            border-left: 5px solid #444;
-            gap: 15px;
-        }
-        .slot.operator { border-left-color: var(--primary-color); }
-        .slot.partner { border-left-color: var(--partner-color); }
-        .slot-info { font-family: "Courier New", Courier, monospace; word-break: break-all; }
-        .slot-info .tag { font-weight: bold; font-size: 1.1em; }
-        .slot-info .address { color: var(--text-secondary-color); font-size: 0.9em; }
-        .assign-btn { background-color: var(--success-color); }
-        .assign-btn:hover:not(:disabled) { background-color: #2ecc71; }
-        #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 1000; }
-        .loader { border: 5px solid #f3f3f3; border-top: 5px solid var(--primary-color); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    </style>
-</head>
-<body>
-    <div id="loading-overlay"><div class="loader"></div></div>
-    <div class="container">
-        <h1>Công cụ Kích hoạt Worker</h1>
-        <div class="connect-section">
-            <button id="connect-wallet-btn" class="button">Kết nối Ví (Eternl/Nami/Yoroi)</button>
-        </div>
-        <p id="status-text">Vui lòng kết nối ví để tải thông tin máy chủ.</p>
-        <div id="main-content" style="display: none;">
-            <h2 id="vps-title"></h2>
-            <div id="worker-slots"></div>
-        </div>
-    </div>
-
-    <script>
-        // --- CẤU HÌNH ---
+// --- CẤU HÌNH ---
         const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwr8EVpgbB-occKnqIiVwq4bCAC0giw8kN8OOXCtcwmY5QBA5MahyMrppEoCDtcgvq-ew/exec";
         const MESSAGE_TO_SIGN_HEX = "281ba5f69f4b943e3fb8a20390878a232787a04e4be22177f2472b63df01c200";
 
         // --- BIẾN TOÀN CỤC ---
         let cardano, walletAPI, vpsName, machineConfig;
-        
-        // === HÀM TIỆN ÍCH (SỬA LỖI) ===
+
+        // --- HÀM TIỆN ÍCH ---
         const showLoader = (show) => { document.getElementById('loading-overlay').style.display = show ? 'flex' : 'none'; };
         const hexToBytes = (hex) => {
+            if (!hex || hex.length % 2 !== 0) return new Uint8Array();
             const bytes = new Uint8Array(hex.length / 2);
             for (let i = 0; i < hex.length; i += 2) {
                 bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
@@ -127,7 +16,7 @@
             return bytes;
         };
 
-        // === LOGIC JSONP ===
+        // --- LOGIC JSONP ---
         function jsonp_callback(data) {
             showLoader(false);
             if (data.error) {
@@ -150,7 +39,7 @@
             script.onload = () => document.body.removeChild(script);
         }
 
-        // === LOGIC CHÍNH ===
+        // --- LOGIC CHÍNH ---
         function renderWorkerSlots() {
             if (!machineConfig) return;
             document.getElementById('vps-title').textContent = `Trạng thái các Slot trên: ${machineConfig.vpsName}`;
@@ -176,7 +65,7 @@
 
         async function assignSlot(slotIndex, isOperator) {
             if (!walletAPI) { alert("Vui lòng kết nối ví trước."); return; }
-            const button = document.querySelector(`#slot-${slotIndex} button`);
+            const button = document.querySelector(`#slot-${index} button`);
             button.textContent = 'Đang ký...';
             button.disabled = true;
             showLoader(true);
@@ -208,8 +97,7 @@
                 showLoader(false);
             }
         }
-        
-        // === HÀM KẾT NỐI VÍ (ĐÃ SỬA LỖI) ===
+
         async function connectWallet() {
             if (typeof window.cardano === 'undefined' || Object.keys(window.cardano).length === 0) {
                 alert('Lỗi: Không tìm thấy ví Cardano. Vui lòng cài đặt extension (Eternl, Nami, Yoroi).');
@@ -237,24 +125,34 @@
             }
         }
         
-        // === KHỞI CHẠY ===
+        // === HÀM KHỞI TẠO CHÍNH (SỬA LỖI RACE CONDITION) ===
+        function main() {
+            const urlParams = new URLSearchParams(window.location.search);
+            vpsName = urlParams.get('vps_name');
+            const connectBtn = document.getElementById('connect-wallet-btn');
+            if (!vpsName) {
+                document.getElementById('status-text').textContent = "URL không hợp lệ. Vui lòng cung cấp `?vps_name=TEN_VPS`.";
+                connectBtn.disabled = true;
+            } else {
+                connectBtn.addEventListener('click', connectWallet);
+            }
+        }
+        
+        // --- KHỞI CHẠY ---
+        // Đảm bảo rằng logic chính chỉ chạy SAU KHI thư viện đã được tải xong.
         window.addEventListener('DOMContentLoaded', () => {
-            window.cardano_serialization_lib.load().then((lib) => {
-                cardano = lib;
-                const urlParams = new URLSearchParams(window.location.search);
-                vpsName = urlParams.get('vps_name');
-                const connectBtn = document.getElementById('connect-wallet-btn');
-                if (!vpsName) {
-                    document.getElementById('status-text').textContent = "URL không hợp lệ. Vui lòng cung cấp `?vps_name=TEN_VPS`.";
-                    connectBtn.disabled = true;
-                } else {
-                    connectBtn.addEventListener('click', connectWallet);
-                }
-            }).catch(e => {
-                alert("Không thể tải thư viện Cardano. Vui lòng làm mới trang.");
-                console.error(e);
-            });
+            if (window.cardano_serialization_lib) {
+                window.cardano_serialization_lib.load()
+                    .then((lib) => {
+                        cardano = lib;
+                        main(); // Gọi hàm chính
+                    })
+                    .catch(e => {
+                        alert("Không thể tải thư viện Cardano. Vui lòng làm mới trang.");
+                        console.error("Lỗi khi tải cardano_serialization_lib:", e);
+                    });
+            } else {
+                console.error("Đối tượng cardano_serialization_lib không tồn tại. Script có thể đã không được tải.");
+                alert("Lỗi nghiêm trọng: Thư viện Cardano không được tải. Kiểm tra lại thẻ script trong HTML.");
+            }
         });
-    </script>
-</body>
-</html>
