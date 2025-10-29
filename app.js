@@ -1,4 +1,4 @@
-// app.js (v4.8 - Manual Copy-Paste Data Export)
+// app.js (v4.5 - Final Address Fix & Unused Addresses Feature)
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log('[App] DOM loaded. Initializing...');
@@ -9,12 +9,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const disconnectBtn = document.getElementById('disconnectBtn');
     const statusMessage = document.getElementById('statusMessage');
     const ownerAddressEl = document.getElementById('ownerAddress');
-    
-    // Containers for output data
-    const jsonContainer = document.getElementById('jsonContainer');
+    const jsonOutputContainer = document.querySelector('.output-container');
     const jsonOutputEl = document.getElementById('jsonOutput');
-    const pasteContainer = document.getElementById('pasteContainer');
-    const pasteDataOutputEl = document.getElementById('pasteDataOutput');
 
     // === State Management ===
     let walletApi = null;
@@ -44,8 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (state === 'initial') {
             connectBtn.disabled = false;
             ownerAddressEl.textContent = 'Chưa kết nối';
-            jsonContainer.classList.add('hidden');
-            pasteContainer.classList.add('hidden');
+            jsonOutputContainer.classList.add('hidden');
         } else if (state === 'connecting') {
             connectBtn.disabled = true;
             showStatus('Đang kết nối...', 'info');
@@ -102,17 +97,19 @@ document.addEventListener('DOMContentLoaded', () => {
             if (walletApi.onAccountChange) walletApi.onAccountChange(() => resetState('Tài khoản ví đã thay đổi.'));
             if (walletApi.onNetworkChange) walletApi.onNetworkChange(() => resetState('Mạng ví đã thay đổi.'));
 
+            // --- FIX START: Correct Stake Address Decoding ---
             const rawRewardAddresses = await walletApi.getRewardAddresses();
             if (!rawRewardAddresses || rawRewardAddresses.length === 0) throw new Error("Ví không trả về địa chỉ stake (reward address).");
 
             const stakeHex = rawRewardAddresses[0];
             const rewardAddressBytes = hexToBytes(stakeHex);
-            const rewardAddress = S.RewardAddress.from_bytes(rewardAddressBytes);
+            const rewardAddress = S.RewardAddress.from_address(S.Address.from_bytes(rewardAddressBytes));
             
             if (!rewardAddress) throw new Error("Không thể giải mã địa chỉ stake từ ví.");
 
-            stakeAddress = rewardAddress.to_address().to_bech32(); // Sửa lỗi typo quan trọng ở đây
+            stakeAddress = rewardAddress.to_address().to_bech32();
             console.log(`[App] Correctly decoded stake address: ${stakeAddress}`);
+            // --- FIX END ---
 
             const unusedAddresses = await walletApi.getUnusedAddresses();
             if (!unusedAddresses || unusedAddresses.length === 0) throw new Error('Không tìm thấy địa chỉ chưa sử dụng.');
@@ -136,47 +133,36 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         updateUIState('signing');
         try {
+            // --- FEATURE START: Fetch Unused Addresses for JSON output ---
             const freshUnusedAddresses = await walletApi.getUnusedAddresses();
             if (!freshUnusedAddresses || freshUnusedAddresses.length === 0) throw new Error('Không lấy được địa chỉ thanh toán.');
             const paymentAddress = freshUnusedAddresses[0];
-            
+            // --- FEATURE END ---
+
             const nonceArray = new Uint32Array(1);
             window.crypto.getRandomValues(nonceArray);
             const nonce = `nonce-${nonceArray[0]}`;
+
             const originalPayload = `Xác thực cho hệ thống kiểm thử Sign-Mine-NIGHT với nonce: ${nonce}`;
             const hexPayload = utf8StringToHex(originalPayload);
             
             const signedData = await walletApi.signData(paymentAddress, hexPayload);
 
-            const resultData = {
+            const resultJSON = {
                 owner: stakeAddress,
                 publicKey: signedData.key,
                 signature: signedData.signature,
-                paymentAddress: paymentAddress
+                originalPayload: originalPayload,
+                payloadEncoding: "utf-8",
+                paymentAddress: paymentAddress,
+                // --- FEATURE START: Add unused addresses to the output ---
+                unusedAddresses: freshUnusedAddresses
+                // --- FEATURE END ---
             };
             
-            // --- Hiển thị kết quả ---
-
-            // 1. Hiển thị JSON đầy đủ để tiện debug
-            jsonOutputEl.textContent = JSON.stringify({ ...resultData, unusedAddresses: freshUnusedAddresses }, null, 2);
-            jsonContainer.classList.remove('hidden');
-
-            // 2. Tạo chuỗi dữ liệu để dán vào Sheet
-            // Định dạng: owner   publicKey   <để trống>   signature    paymentAddress
-            // Ký tự `\t` (tab) sẽ giúp Google Sheet tự động điền vào các ô liền kề
-            const pasteString = [
-                resultData.owner,
-                resultData.publicKey,
-                '', // Để trống cho cột F
-                resultData.signature,
-                resultData.paymentAddress
-            ].join('\t');
-            
-            // 3. Hiển thị dữ liệu này trong textarea để người dùng sao chép
-            pasteDataOutputEl.value = pasteString;
-            pasteContainer.classList.remove('hidden');
-            
-            showStatus('Ký dữ liệu thành công! Bạn có thể sao chép dữ liệu bên dưới.', 'success');
+            jsonOutputEl.textContent = JSON.stringify(resultJSON, null, 2);
+            jsonOutputContainer.classList.remove('hidden');
+            showStatus('Ký dữ liệu thành công!', 'success');
 
         } catch (error) {
             console.error('[Error] Signing failed:', error);
