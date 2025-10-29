@@ -1,4 +1,4 @@
-// app.js (v4.5 - Final Address Fix & Unused Addresses Feature)
+// app.js (v4.6 - Definitive Stake Address Fix)
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log('[App] DOM loaded. Initializing...');
@@ -97,16 +97,19 @@ document.addEventListener('DOMContentLoaded', () => {
             if (walletApi.onAccountChange) walletApi.onAccountChange(() => resetState('Tài khoản ví đã thay đổi.'));
             if (walletApi.onNetworkChange) walletApi.onNetworkChange(() => resetState('Mạng ví đã thay đổi.'));
 
-            // --- FIX START: Correct Stake Address Decoding ---
+            // --- FIX START: Definitive Stake Address Decoding ---
             const rawRewardAddresses = await walletApi.getRewardAddresses();
             if (!rawRewardAddresses || rawRewardAddresses.length === 0) throw new Error("Ví không trả về địa chỉ stake (reward address).");
 
             const stakeHex = rawRewardAddresses[0];
             const rewardAddressBytes = hexToBytes(stakeHex);
-            const rewardAddress = S.RewardAddress.from_address(S.Address.from_bytes(rewardAddressBytes));
+
+            // This is the correct method: construct RewardAddress directly from its bytes.
+            const rewardAddress = S.RewardAddress.from_bytes(rewardAddressBytes);
             
             if (!rewardAddress) throw new Error("Không thể giải mã địa chỉ stake từ ví.");
 
+            // Convert the RewardAddress object to a generic Address object, then to bech32.
             stakeAddress = rewardAddress.to_address().to_bech32();
             console.log(`[App] Correctly decoded stake address: ${stakeAddress}`);
             // --- FIX END ---
@@ -126,6 +129,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const handleSign = async () => {
+        // ... (Hàm này không thay đổi từ v4.5)
         console.log('[Action] Sign button clicked');
         if (!walletApi || !stakeAddress) {
             resetState('Lỗi trạng thái kết nối.');
@@ -133,11 +137,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         updateUIState('signing');
         try {
-            // --- FEATURE START: Fetch Unused Addresses for JSON output ---
             const freshUnusedAddresses = await walletApi.getUnusedAddresses();
             if (!freshUnusedAddresses || freshUnusedAddresses.length === 0) throw new Error('Không lấy được địa chỉ thanh toán.');
             const paymentAddress = freshUnusedAddresses[0];
-            // --- FEATURE END ---
 
             const nonceArray = new Uint32Array(1);
             window.crypto.getRandomValues(nonceArray);
@@ -155,9 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 originalPayload: originalPayload,
                 payloadEncoding: "utf-8",
                 paymentAddress: paymentAddress,
-                // --- FEATURE START: Add unused addresses to the output ---
                 unusedAddresses: freshUnusedAddresses
-                // --- FEATURE END ---
             };
             
             jsonOutputEl.textContent = JSON.stringify(resultJSON, null, 2);
