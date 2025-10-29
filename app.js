@@ -1,6 +1,8 @@
-// app.js (Patched Version)
+// app.js (v4.2 - Robust Version)
 
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('[App] DOM loaded. Initializing...');
+
     // === DOM Element Selection ===
     const connectBtn = document.getElementById('connectBtn');
     const signBtn = document.getElementById('signBtn');
@@ -15,123 +17,118 @@ document.addEventListener('DOMContentLoaded', () => {
     let stakeAddress = null;
 
     // === Helper Functions ===
-    /**
-     * Chuyển đổi chuỗi UTF-8 sang chuỗi Hex sử dụng TextEncoder.
-     * Đây là phương pháp đáng tin cậy để đảm bảo mã hóa chính xác.
-     * @param {string} str Chuỗi UTF-8 đầu vào.
-     * @returns {string} Chuỗi Hex tương ứng.
-     */
     const utf8StringToHex = (str) => {
         const encoder = new TextEncoder();
         const data = encoder.encode(str);
         return Array.from(data, byte => byte.toString(16).padStart(2, '0')).join('');
     };
 
-    /**
-     * Hiển thị thông báo trạng thái trên UI.
-     * @param {string} message - Nội dung thông báo.
-     * @param {'info' | 'success' | 'error'} type - Loại thông báo.
-     */
     const showStatus = (message, type = 'info') => {
         statusMessage.textContent = message;
         statusMessage.className = `status ${type}`;
+        console.log(`[Status] ${type.toUpperCase()}: ${message}`);
     };
 
-    /**
-     * Cập nhật giao diện dựa trên trạng thái ứng dụng.
-     * @param {'initial' | 'connecting' | 'connected' | 'signing'} state 
-     */
     const updateUIState = (state) => {
+        console.log(`[App] Switching to state: ${state}`);
+        
+        // Hiển thị/ẩn các nút dựa trên trạng thái
         connectBtn.classList.toggle('hidden', state !== 'initial');
         signBtn.classList.toggle('hidden', state !== 'connected');
         disconnectBtn.classList.toggle('hidden', state !== 'connected');
         
-        signBtn.disabled = state === 'signing';
-        disconnectBtn.disabled = state === 'signing';
-        
+        // Quản lý trạng thái disabled một cách rõ ràng
         if (state === 'initial') {
+            connectBtn.disabled = false; // Đảm bảo nút kết nối luôn bật khi ở trạng thái ban đầu
             ownerAddressEl.textContent = 'Chưa kết nối';
             jsonOutputContainer.classList.add('hidden');
             jsonOutputEl.textContent = '';
-        } else if (state === 'connecting' || state === 'signing') {
-            const statusText = state === 'connecting' ? 'Đang kết nối...' : 'Đang chờ ký...';
-            showStatus(statusText, 'info');
+        } else if (state === 'connecting') {
+            connectBtn.disabled = true; // Khóa nút khi đang kết nối
+            showStatus('Đang kết nối...', 'info');
             jsonOutputContainer.classList.add('hidden');
+        } else if (state === 'connected') {
+            signBtn.disabled = false;
+            disconnectBtn.disabled = false;
+        } else if (state === 'signing') {
+            signBtn.disabled = true;
+            disconnectBtn.disabled = true;
+            showStatus('Đang chờ người dùng ký...', 'info');
         }
     };
 
-    /**
-     * Reset trạng thái ứng dụng về ban đầu.
-     * Được gọi khi ngắt kết nối, đổi tài khoản, hoặc đổi mạng.
-     */
     const resetState = (reason = '') => {
         walletApi = null;
         stakeAddress = null;
         updateUIState('initial');
-        const message = reason ? `${reason} Đã ngắt kết nối.` : 'Sẵn sàng kết nối.';
-        showStatus(message, 'info');
-        console.log(`State reset triggered. Reason: ${reason || 'User action'}`);
+        if (reason) {
+            showStatus(`${reason} Đã ngắt kết nối.`, 'info');
+        } else {
+             // Kiểm tra xem ví đã sẵn sàng chưa để hiển thị thông báo phù hợp
+             if (typeof window.cardano === 'undefined') {
+                 showStatus('Không tìm thấy ví Cardano. Hãy đảm bảo bạn đã cài extension.', 'error');
+             } else {
+                 showStatus('Sẵn sàng kết nối.', 'info');
+             }
+        }
     };
 
     // === Core Logic Handlers ===
 
     const handleConnect = async () => {
+        console.log('[Action] Connect button clicked');
+        
+        // Kiểm tra lại sự tồn tại của ví ngay thời điểm bấm nút
         if (typeof window.cardano === 'undefined') {
-            showStatus('Lỗi: Không tìm thấy extension ví Cardano.', 'error');
+            showStatus('Lỗi: Không tìm thấy extension ví Cardano. Vui lòng tải lại trang sau khi cài đặt.', 'error');
             return;
         }
 
         updateUIState('connecting');
 
         try {
+            // Tìm ví tương thích (ưu tiên ví đầu tiên tìm thấy có hàm enable)
             const walletName = Object.keys(window.cardano).find(key => 
                 typeof window.cardano[key].enable === 'function' && key !== 'enable'
             );
 
             if (!walletName) {
-                throw new Error('Không tìm thấy ví tương thích nào.');
+                 throw new Error('Không tìm thấy ví tương thích (Yoroi, Nami, Eternl, v.v).');
             }
 
+            console.log(`[App] Attempting to connect to wallet: ${walletName}`);
             walletApi = await window.cardano[walletName].enable();
+            console.log('[App] Wallet enabled successfully');
             
-            // --- FIX START ---
-            // Gán các trình lắng nghe sự kiện VÀO ĐỐI TƯỢNG API CỦA VÍ, sau khi đã kết nối thành công.
-            if (walletApi.onAccountChange) {
-                walletApi.onAccountChange(() => resetState('Tài khoản ví đã thay đổi.'));
-            }
-            if (walletApi.onNetworkChange) {
-                walletApi.onNetworkChange(() => resetState('Mạng ví đã thay đổi.'));
-            }
-            // --- FIX END ---
-            
-            // Validation 1: Kiểm tra địa chỉ Stake
+            // --- EVENT LISTENERS SETUP ---
+            // Chỉ thiết lập nếu API hỗ trợ
+            if (walletApi.onAccountChange) walletApi.onAccountChange(() => resetState('Tài khoản ví đã thay đổi.'));
+            if (walletApi.onNetworkChange) walletApi.onNetworkChange(() => resetState('Mạng ví đã thay đổi.'));
+
+            // --- VALIDATION ---
             const rewardAddresses = await walletApi.getRewardAddresses();
-            if (!rewardAddresses || rewardAddresses.length === 0) {
-                throw new Error('Ví của bạn chưa đăng ký địa chỉ stake. Vui lòng kiểm tra lại.');
-            }
+            if (!rewardAddresses || rewardAddresses.length === 0) throw new Error('Ví chưa có địa chỉ stake.');
             stakeAddress = rewardAddresses[0];
 
-            // Validation 2: Kiểm tra địa chỉ chưa sử dụng
             const unusedAddresses = await walletApi.getUnusedAddresses();
-            if (!unusedAddresses || unusedAddresses.length === 0) {
-                 throw new Error('Không tìm thấy địa chỉ chưa sử dụng. Vui lòng tạo địa chỉ mới trong ví.');
-            }
+             if (!unusedAddresses || unusedAddresses.length === 0) throw new Error('Không tìm thấy địa chỉ chưa sử dụng.');
 
-            // Cập nhật giao diện thành công
+            // --- SUCCESS ---
             ownerAddressEl.textContent = stakeAddress;
             updateUIState('connected');
             showStatus('Kết nối ví thành công!', 'success');
 
         } catch (error) {
-            console.error('Lỗi kết nối ví:', error);
-            showStatus(error.info || error.message || 'Yêu cầu kết nối bị từ chối.', 'error');
-            resetState();
+            console.error('[Error] Connection failed:', error);
+            showStatus(error.info || error.message || 'Kết nối thất bại.', 'error');
+            resetState(); // Reset về ban đầu nếu lỗi
         }
     };
 
     const handleSign = async () => {
+        console.log('[Action] Sign button clicked');
         if (!walletApi || !stakeAddress) {
-            resetState('Lỗi trạng thái không hợp lệ.');
+            resetState('Lỗi trạng thái kết nối.');
             return;
         }
 
@@ -139,9 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             const freshUnusedAddresses = await walletApi.getUnusedAddresses();
-            if (!freshUnusedAddresses || freshUnusedAddresses.length === 0) {
-                throw new Error('Không lấy được địa chỉ thanh toán mới nhất.');
-            }
+            if (!freshUnusedAddresses || freshUnusedAddresses.length === 0) throw new Error('Không lấy được địa chỉ thanh toán.');
             const paymentAddress = freshUnusedAddresses[0];
 
             const nonceArray = new Uint32Array(1);
@@ -151,7 +146,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const originalPayload = `Xác thực cho hệ thống kiểm thử Sign-Mine-NIGHT với nonce: ${nonce}`;
             const hexPayload = utf8StringToHex(originalPayload);
             
+            console.log('[App] Requesting signature from wallet...');
             const signedData = await walletApi.signData(paymentAddress, hexPayload);
+            console.log('[App] Signature received');
 
             const resultJSON = {
                 owner: stakeAddress,
@@ -167,28 +164,19 @@ document.addEventListener('DOMContentLoaded', () => {
             showStatus('Ký dữ liệu thành công!', 'success');
 
         } catch (error) {
-            console.error('Lỗi khi ký dữ liệu:', error);
-            showStatus(error.info || error.message || 'Yêu cầu ký đã bị hủy.', 'error');
+            console.error('[Error] Signing failed:', error);
+            showStatus(error.info || error.message || 'Đã hủy ký dữ liệu.', 'error');
         } finally {
-            updateUIState('connected');
+            if (walletApi) updateUIState('connected'); // Chỉ quay lại 'connected' nếu vẫn chưa bị reset
         }
     };
 
-    /**
-     * Khởi tạo ứng dụng.
-     */
-    const initialize = () => {
-        if (typeof window.cardano === 'undefined') {
-            showStatus('Vui lòng cài đặt một ví Cardano (ví dụ: Yoroi, Eternl).', 'error');
-            connectBtn.disabled = true;
-        }
-        
-        connectBtn.addEventListener('click', handleConnect);
-        signBtn.addEventListener('click', handleSign);
-        disconnectBtn.addEventListener('click', () => resetState('Người dùng ngắt kết nối.'));
+    // === Initialization ===
+    // Gán sự kiện click
+    connectBtn.addEventListener('click', handleConnect);
+    signBtn.addEventListener('click', handleSign);
+    disconnectBtn.addEventListener('click', () => resetState('Người dùng ngắt kết nối.'));
 
-        resetState();
-    };
-
-    initialize();
+    // Khởi tạo trạng thái ban đầu
+    resetState();
 });
