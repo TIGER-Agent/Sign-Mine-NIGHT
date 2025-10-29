@@ -90,3 +90,14 @@ code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courie
 .hidden {
     display: none;
 }
+/* Thêm vào cuối file style.css */
+textarea {
+    width: 100%;
+    padding: 0.8rem;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+    background-color: #f1f3f4;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    resize: vertical;
+    box-sizing: border-box; /* Đảm bảo padding không làm vỡ layout */
+}
