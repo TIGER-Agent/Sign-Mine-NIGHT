@@ -1,8 +1,8 @@
-// app.js (v4.2 - Robust Version)
+// app.js (v4.4 - Non-blocking Initialization Fix)
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log('[App] DOM loaded. Initializing...');
-
+    
     // === DOM Element Selection ===
     const connectBtn = document.getElementById('connectBtn');
     const signBtn = document.getElementById('signBtn');
@@ -31,22 +31,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const updateUIState = (state) => {
         console.log(`[App] Switching to state: ${state}`);
-        
-        // Hiển thị/ẩn các nút dựa trên trạng thái
         connectBtn.classList.toggle('hidden', state !== 'initial');
         signBtn.classList.toggle('hidden', state !== 'connected');
         disconnectBtn.classList.toggle('hidden', state !== 'connected');
         
-        // Quản lý trạng thái disabled một cách rõ ràng
         if (state === 'initial') {
-            connectBtn.disabled = false; // Đảm bảo nút kết nối luôn bật khi ở trạng thái ban đầu
+            connectBtn.disabled = false;
             ownerAddressEl.textContent = 'Chưa kết nối';
             jsonOutputContainer.classList.add('hidden');
             jsonOutputEl.textContent = '';
         } else if (state === 'connecting') {
-            connectBtn.disabled = true; // Khóa nút khi đang kết nối
+            connectBtn.disabled = true;
             showStatus('Đang kết nối...', 'info');
-            jsonOutputContainer.classList.add('hidden');
         } else if (state === 'connected') {
             signBtn.disabled = false;
             disconnectBtn.disabled = false;
@@ -64,9 +60,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (reason) {
             showStatus(`${reason} Đã ngắt kết nối.`, 'info');
         } else {
-             // Kiểm tra xem ví đã sẵn sàng chưa để hiển thị thông báo phù hợp
              if (typeof window.cardano === 'undefined') {
-                 showStatus('Không tìm thấy ví Cardano. Hãy đảm bảo bạn đã cài extension.', 'error');
+                 showStatus('Chưa tìm thấy ví Cardano. Extension có thể đang tải...', 'info');
              } else {
                  showStatus('Sẵn sàng kết nối.', 'info');
              }
@@ -77,43 +72,50 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const handleConnect = async () => {
         console.log('[Action] Connect button clicked');
-        
-        // Kiểm tra lại sự tồn tại của ví ngay thời điểm bấm nút
         if (typeof window.cardano === 'undefined') {
-            showStatus('Lỗi: Không tìm thấy extension ví Cardano. Vui lòng tải lại trang sau khi cài đặt.', 'error');
+            showStatus('Lỗi: Không tìm thấy extension ví Cardano. Vui lòng cài đặt và tải lại trang.', 'error');
             return;
         }
+        
+        // --- FIX START ---
+        // Kiểm tra thư viện serialization TẠI ĐÂY, ngay trước khi cần dùng.
+        if (typeof window.cardano_serialization_lib === 'undefined') {
+            showStatus('Lỗi: Không thể tải thư viện Cardano cần thiết. Vui lòng kiểm tra kết nối mạng và thử lại.', 'error');
+            return;
+        }
+        const S = window.cardano_serialization_lib;
+        // --- FIX END ---
 
         updateUIState('connecting');
 
         try {
-            // Tìm ví tương thích (ưu tiên ví đầu tiên tìm thấy có hàm enable)
             const walletName = Object.keys(window.cardano).find(key => 
                 typeof window.cardano[key].enable === 'function' && key !== 'enable'
             );
-
-            if (!walletName) {
-                 throw new Error('Không tìm thấy ví tương thích (Yoroi, Nami, Eternl, v.v).');
-            }
-
-            console.log(`[App] Attempting to connect to wallet: ${walletName}`);
-            walletApi = await window.cardano[walletName].enable();
-            console.log('[App] Wallet enabled successfully');
+            if (!walletName) throw new Error('Không tìm thấy ví tương thích.');
             
-            // --- EVENT LISTENERS SETUP ---
-            // Chỉ thiết lập nếu API hỗ trợ
+            walletApi = await window.cardano[walletName].enable();
+            
             if (walletApi.onAccountChange) walletApi.onAccountChange(() => resetState('Tài khoản ví đã thay đổi.'));
             if (walletApi.onNetworkChange) walletApi.onNetworkChange(() => resetState('Mạng ví đã thay đổi.'));
 
-            // --- VALIDATION ---
-            const rewardAddresses = await walletApi.getRewardAddresses();
-            if (!rewardAddresses || rewardAddresses.length === 0) throw new Error('Ví chưa có địa chỉ stake.');
-            stakeAddress = rewardAddresses[0];
+            const networkId = await walletApi.getNetworkId();
+            const usedAddresses = await walletApi.getUsedAddresses();
+            if (!usedAddresses || usedAddresses.length === 0) throw new Error("Ví không có địa chỉ đã sử dụng (cần để lấy stake key).");
+
+            // Lấy stake address từ một trong các địa chỉ đã sử dụng
+            const firstUsedAddress = S.Address.from_bech32(usedAddresses[0]);
+            const baseAddress = S.BaseAddress.from_address(firstUsedAddress);
+            if (!baseAddress) throw new Error("Địa chỉ không phải là loại Base Address, không thể trích xuất stake key.");
+            
+            const stakeCred = baseAddress.stake_cred();
+            const rewardAddress = S.RewardAddress.new(networkId, stakeCred);
+            stakeAddress = rewardAddress.to_address().to_bech32();
+            console.log(`[App] Converted stake address: ${stakeAddress}`);
 
             const unusedAddresses = await walletApi.getUnusedAddresses();
-             if (!unusedAddresses || unusedAddresses.length === 0) throw new Error('Không tìm thấy địa chỉ chưa sử dụng.');
+            if (!unusedAddresses || unusedAddresses.length === 0) throw new Error('Không tìm thấy địa chỉ chưa sử dụng.');
 
-            // --- SUCCESS ---
             ownerAddressEl.textContent = stakeAddress;
             updateUIState('connected');
             showStatus('Kết nối ví thành công!', 'success');
@@ -121,19 +123,18 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error('[Error] Connection failed:', error);
             showStatus(error.info || error.message || 'Kết nối thất bại.', 'error');
-            resetState(); // Reset về ban đầu nếu lỗi
+            resetState();
         }
     };
 
     const handleSign = async () => {
+        // ... (Hàm này không thay đổi)
         console.log('[Action] Sign button clicked');
         if (!walletApi || !stakeAddress) {
             resetState('Lỗi trạng thái kết nối.');
             return;
         }
-
         updateUIState('signing');
-
         try {
             const freshUnusedAddresses = await walletApi.getUnusedAddresses();
             if (!freshUnusedAddresses || freshUnusedAddresses.length === 0) throw new Error('Không lấy được địa chỉ thanh toán.');
@@ -146,9 +147,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const originalPayload = `Xác thực cho hệ thống kiểm thử Sign-Mine-NIGHT với nonce: ${nonce}`;
             const hexPayload = utf8StringToHex(originalPayload);
             
-            console.log('[App] Requesting signature from wallet...');
             const signedData = await walletApi.signData(paymentAddress, hexPayload);
-            console.log('[App] Signature received');
 
             const resultJSON = {
                 owner: stakeAddress,
@@ -167,16 +166,13 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('[Error] Signing failed:', error);
             showStatus(error.info || error.message || 'Đã hủy ký dữ liệu.', 'error');
         } finally {
-            if (walletApi) updateUIState('connected'); // Chỉ quay lại 'connected' nếu vẫn chưa bị reset
+            if (walletApi) updateUIState('connected');
         }
     };
 
     // === Initialization ===
-    // Gán sự kiện click
     connectBtn.addEventListener('click', handleConnect);
     signBtn.addEventListener('click', handleSign);
     disconnectBtn.addEventListener('click', () => resetState('Người dùng ngắt kết nối.'));
-
-    // Khởi tạo trạng thái ban đầu
     resetState();
 });
