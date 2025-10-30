@@ -1,103 +1,19 @@
-/* style.css */
-body { 
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-    background-color: #f0f2f5; 
-    color: #333; 
-    display: flex; 
-    justify-content: center; 
-    align-items: center; 
-    min-height: 100vh; 
-    margin: 0; 
-    padding: 1rem;
-    box-sizing: border-box;
-}
-
-.container { 
-    background-color: white; 
-    padding: 2rem; 
-    border-radius: 12px; 
-    box-shadow: 0 6px 20px rgba(0,0,0,0.08); 
-    width: 100%; 
-    max-width: 700px;
-    transition: all 0.3s ease;
-}
-
-h1 { 
-    color: #1a1a1a; 
-    text-align: center; 
-    margin-top: 0;
-    margin-bottom: 2rem; 
-}
-
-.actions { 
-    display: flex; 
-    gap: 1rem; 
-    margin-bottom: 1.5rem; 
-    justify-content: center;
-}
-
-.btn { 
-    padding: 0.8rem 1.5rem; 
-    font-size: 1rem; 
-    font-weight: 600;
-    border: none; 
-    border-radius: 8px; 
-    cursor: pointer; 
-    transition: all 0.2s ease-in-out;
-}
-.btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-}
-
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f0f2f5; color: #333; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 1rem; box-sizing: border-box; }
+.container { background-color: white; padding: 2rem; border-radius: 12px; box-shadow: 0 6px 20px rgba(0,0,0,0.08); width: 100%; max-width: 700px; transition: all 0.3s ease; }
+h1 { color: #1a1a1a; text-align: center; margin-top: 0; margin-bottom: 2rem; }
+.actions { display: flex; gap: 1rem; margin-bottom: 1.5rem; justify-content: center; }
+.btn { padding: 0.8rem 1.5rem; font-size: 1rem; font-weight: 600; border: none; border-radius: 8px; cursor: pointer; transition: all 0.2s ease-in-out; }
+.btn:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
 #connectBtn { background-color: #1a73e8; color: white; }
 #signBtn { background-color: #1e8e3e; color: white; }
 #disconnectBtn { background-color: #6c757d; color: white; }
 .btn:disabled { background-color: #ccc; cursor: not-allowed; transform: none; box-shadow: none; }
-
-.status { 
-    margin-top: 1.5rem; 
-    text-align: center; 
-    font-weight: 500;
-    min-height: 24px;
-}
-.status.success { color: #1e8e3e; }
-.status.error { color: #d93025; }
-.status.info { color: #5f6368; }
-
-.results { 
-    margin-top: 1rem; 
-    border-top: 1px solid #e0e0e0; 
-    padding-top: 1rem; 
-}
+.status { margin-top: 1.5rem; text-align: center; font-weight: 500; min-height: 24px; }
+.status.success { color: #1e8e3e; } .status.error { color: #d93025; } .status.info { color: #5f6368; }
+.results { margin-top: 1rem; border-top: 1px solid #e0e0e0; padding-top: 1rem; }
 .results p { word-wrap: break-word; }
 .results code { background-color: #f1f3f4; padding: 0.2rem 0.4rem; border-radius: 4px; }
-
-.output-container {
-    margin-top: 1.5rem;
-}
-pre {
-    background-color: #282c34;
-    color: #abb2bf;
-    padding: 1rem;
-    border-radius: 8px;
-    overflow-x: auto;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-}
-code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace; }
-
-.hidden {
-    display: none;
-}
-/* Thêm vào cuối file style.css */
-textarea {
-    width: 100%;
-    padding: 0.8rem;
-    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
-    background-color: #f1f3f4;
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-    resize: vertical;
-    box-sizing: border-box; /* Đảm bảo padding không làm vỡ layout */
-}
+.output-container { margin-top: 1.5rem; }
+.hidden { display: none; }
+pre { background-color: #282c34; color: #abb2bf; padding: 1rem; border-radius: 8px; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word; }
+textarea { width: 100%; padding: 0.8rem; font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace; background-color: #f1f3f4; border: 1px solid #dee2e6; border-radius: 8px; resize: vertical; box-sizing: border-box; }
