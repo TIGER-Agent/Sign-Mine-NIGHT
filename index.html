@@ -3,12 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cardano Signature Tool v5.1 (Stable)</title>
+    <title>Cardano Signature Tool v6.0 (WASM Ready)</title>
     <link rel="stylesheet" href="style.css">
-    
-    <!-- Tên tệp đã được sửa lỗi -->
-    <script src="libs/cardano_serialization_lib.js"></script>
-
 </head>
 <body>
 
@@ -38,7 +34,8 @@
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <!-- Nạp app.js như một module để nó có thể import các thư viện khác -->
+    <script type="module" src="app.js"></script>
 
 </body>
 </html>
