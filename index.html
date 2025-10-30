@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cardano Signature Tool v6.0 (WASM Ready)</title>
+    <title>Cardano Signature Tool v7.0 (Stable)</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -34,8 +34,10 @@
         </div>
     </div>
 
-    <!-- Nạp app.js như một module để nó có thể import các thư viện khác -->
-    <script type="module" src="app.js"></script>
+    <!-- Nạp thư viện để tạo đối tượng global 'cardano_serialization_lib' -->
+    <script src="./libs/cardano_serialization_lib.js"></script>
+    <!-- Nạp app.js như một script bình thường -->
+    <script src="app.js"></script>
 
 </body>
 </html>
