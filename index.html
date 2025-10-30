@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cardano Signature Tool v4.5</title>
+    <title>Cardano Signature Tool v4.9 (Self-Hosted)</title>
     <link rel="stylesheet" href="style.css">
     
-    <!-- Nạp thư viện Cardano Serialization Lib -->
-    <script src="https://cdn.jsdelivr.net/npm/@emurgo/cardano-serialization-lib-browser@11.5.0/cardano_serialization_lib.min.js"></script>
+    <!-- Nạp thư viện Cardano Serialization Lib từ tệp cục bộ -->
+    <script src="libs/cardano_serialization_lib.min.js"></script>
 
 </head>
 <body>
@@ -27,8 +27,13 @@
             <p><strong>Stake Address:</strong> <code id="ownerAddress">Chưa kết nối</code></p>
         </div>
 
-        <div class="output-container hidden">
-            <h3>Kết quả JSON:</h3>
+        <div id="pasteContainer" class="output-container hidden">
+            <h3>Dữ liệu để Dán vào Sheet (Tab-separated):</h3>
+            <textarea id="pasteDataOutput" rows="4" readonly></textarea>
+        </div>
+
+        <div id="jsonContainer" class="output-container hidden">
+            <h3>Kết quả JSON đầy đủ:</h3>
             <pre><code id="jsonOutput"></code></pre>
         </div>
     </div>
