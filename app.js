@@ -1,14 +1,12 @@
-// app.js (v7.0 - Classic & Reliable WASM Loading)
+// app.js (v7.1 - SyntaxError Fix)
 
 // Đợi cho trang HTML tải xong.
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('[App] DOM is ready. Loading WASM library...');
     
     // Sử dụng đối tượng global được tạo bởi thư viện.
-    // Đổi tên nó thành 'S' cho ngắn gọn.
     const S = window.cardano_serialization_lib;
 
-    // Kiểm tra xem thư viện có được nạp không.
     if (!S) {
         alert("Lỗi nghiêm trọng: Không thể nạp thư viện Cardano.");
         return;
@@ -153,7 +151,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             showStatus('Ký dữ liệu thành công! Bạn có thể sao chép dữ liệu bên dưới.', 'success');
 
-        } catch (error) => {
+        } catch (error) { // <<< SỬA LỖI Ở ĐÂY: ĐÃ XÓA DẤU "=>"
             console.error('[Error] Signing failed:', error);
             showStatus(error.info || error.message || 'Đã hủy ký dữ liệu.', 'error');
         } finally {
